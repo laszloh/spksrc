@@ -1,11 +1,11 @@
 SPK_NAME = transmission
 SPK_VERS = 2.94
-SPK_REV = 16
+SPK_REV = 9999
 SPK_ICON = src/transmission.png
 
 DEPENDS = cross/busybox cross/$(SPK_NAME)
 
-MAINTAINER = Safihre
+MAINTAINER = Simon
 DESCRIPTION = Transmission is an easy and fast BitTorrent client. You can control it remotely with its web interface or dedicated applications.
 DESCRIPTION_FRE = Transmission est un client BitTorrent simple et rapide. Vous pouvez le contrôler à distance grâce à son interface web ou des applications dédiées.
 DESCRIPTION_SPN = Transmission es un cliente BitTorrent simple y rápido. Puedes controlarlo remotamente mediante su interfaz web o alguna aplicación dedicada.

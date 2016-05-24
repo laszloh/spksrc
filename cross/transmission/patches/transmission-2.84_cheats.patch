@@ -1,0 +1,728 @@
+diff -uNr cli/cli.c cli/cli.c
+--- cli/cli.c	2014-07-01 19:10:43.482913163 +0200
++++ cli/cli.c	2015-12-25 17:39:22.705509874 +0100
+@@ -93,6 +93,8 @@
+   { 'v', "verify",               "Verify the specified torrent", "v",  0, NULL        },
+   { 'V', "version",              "Show version number and exit", "V", 0, NULL },
+   { 'w', "download-dir",         "Where to save downloaded data", "w",  1, "<path>"    },
++  { 965, "cheat-mode",           "Set the current torrents cheat mode (0..no cheat, 1..always leecher, 2..always seeder, 3..upload x 2, 4..upload x4)", "cm", 1, "<mode>" },
++  { 865, "cheat-stop-after",     "Stop torrent after download is competed (0..no, 1..yes)", "csa", 1, "<mode>" },
+   { 0, NULL, NULL, NULL, 0, NULL }
+ };
+ 
+@@ -472,6 +474,14 @@
+               torrentPath = optarg;
+             break;
+ 
++          case 965:
++            tr_variantDictAddInt (d, TR_KEY_cheatMode, atoi (optarg));
++            break;
++
++          case 865:
++            tr_variantDictAddBool (d, TR_KEY_cheatStopAfterDl, (atoi (optarg)) ? true : false);
++            break;
++
+           default:
+             return 1;
+         }
+diff -uNr daemon/remote.c daemon/remote.c
+--- daemon/remote.c	2014-07-01 19:10:39.462913067 +0200
++++ daemon/remote.c	2015-12-30 21:54:06.899021664 +0100
+@@ -309,6 +309,9 @@
+     { 'y', "lpd",                    "Enable local peer discovery (LPD)", "y",  0, NULL },
+     { 'Y', "no-lpd",                 "Disable local peer discovery (LPD)", "Y",  0, NULL },
+     { 941, "peer-info",              "List the current torrent(s)' peers", "pi",  0, NULL },
++    { 965, "cheat-mode",             "Set the current torrents cheat mode (0..no cheat, 1..always leecher, 2..always seeder, 3..upload x 2, 4..upload x4)", "cm", 1, "<mode>" },
++    { 865, "cheat-stop-after",       "Stop torrent after download is competed (0..no, 1..yes)", "csa", 1, "<mode>" },
++    { 866, "cheat-ignore-private",   "Ignore private flag of torrents (0..no, 1..yes)", "cip", 1, "<mode>" },
+     {   0, NULL,                     NULL, NULL, 0, NULL }
+ };
+ 
+@@ -445,6 +448,9 @@
+       case 'u': /* upload speed limit */
+       case 'U': /* no upload speed limit */
+       case 930: /* peers */
++      case 965: /* cheat-mode */
++      case 865: /* default-cheat */
++      case 866: /* cheat-ignore-private */
+         return MODE_SESSION_SET | MODE_TORRENT_SET;
+ 
+       case 's': /* start */
+@@ -681,6 +687,9 @@
+     TR_KEY_activityDate,
+     TR_KEY_addedDate,
+     TR_KEY_bandwidthPriority,
++    TR_KEY_cheatIgnorePrivate,
++    TR_KEY_cheatMode,
++    TR_KEY_cheatStopAfterDl,
+     TR_KEY_comment,
+     TR_KEY_corruptEver,
+     TR_KEY_creator,
+@@ -1074,6 +1083,36 @@
+                         bandwidthPriorityNames[ (i + 1) & 3]);
+ 
+             printf ("\n");
++            printf("CHEATS\n");
++            if (tr_variantDictFindInt (t, TR_KEY_cheatMode, &i))
++            {
++                printf("  Cheat mode: ");
++                switch(i) {
++                case TR_CHEAT_DEACT:
++                    printf("Deactivated\n");
++                    break;
++                case TR_CHEAT_ALWLEECH:
++                    printf("Leecher mode (always 0%%)\n");
++                    break;
++                case TR_CHEAT_ALWSEED:
++                    printf("Seed mode (always 100%%)\n");
++                    break;
++                case TR_CHEAT_2RATIO:
++                    printf("Double upload (1.95 - 2.05 multiplier)\n");
++                    break;
++                case TR_CHEAT_4RATIO:
++                    printf(" (Quad upload (3.95 - 4.05 multiplier)\n");
++                    break;
++                }
++            }
++            if (tr_variantDictFindBool (t, TR_KEY_cheatStopAfterDl, &boolVal))
++            {
++                printf("  Stop torrents after download: %s\n", (boolVal) ? "yes" : "no");
++            }
++            if (tr_variantDictFindBool (t, TR_KEY_cheatIgnorePrivate, &boolVal))
++            {
++                printf("  Ignore Private-Flags: %s\n", (boolVal) ? "yes" : "no");
++            }
+         }
+     }
+ }
+@@ -1619,6 +1658,38 @@
+             printf ("  Autostart added torrents: %s\n", (boolVal ? "Yes" : "No"));
+         if (tr_variantDictFindBool (args, TR_KEY_trash_original_torrent_files, &boolVal))
+             printf ("  Delete automatically added torrents: %s\n", (boolVal ? "Yes" : "No"));
++
++        printf("\n");
++        printf("CHEATS FOR NEW TORRENTS\n");
++        if (tr_variantDictFindInt (args, TR_KEY_cheatMode, &i))
++        {
++            printf ("  Default cheat mode: ");
++            switch(i) {
++            case TR_CHEAT_DEACT:
++                printf("Deactivated\n");
++                break;
++            case TR_CHEAT_ALWLEECH:
++                printf("Leecher mode (always 0%%)\n");
++                break;
++            case TR_CHEAT_ALWSEED:
++                printf("Seed mode (always 100%%)\n");
++                break;
++            case TR_CHEAT_2RATIO:
++                printf("Double upload (1.95 - 2.05 multiplier)\n");
++                break;
++            case TR_CHEAT_4RATIO:
++                printf("Quad upload (3.95 - 4.05 multiplier)\n");
++                break;
++            }
++        }
++        if (tr_variantDictFindBool (args, TR_KEY_cheatStopAfterDl, &boolVal))
++        {
++            printf("  Stop torrents after download: %s\n", (boolVal) ? "yes" : "no");
++        }
++        if (tr_variantDictFindBool (args, TR_KEY_cheatIgnorePrivate, &boolVal))
++        {
++            printf("  Ignore Private-Flags: %s\n", (boolVal) ? "yes" : "no");
++        }
+     }
+ }
+ 
+@@ -2141,6 +2212,21 @@
+                           else
+                               tr_variantDictAddInt (sargs, TR_KEY_peer_limit_global, atoi (optarg));
+                           break;
++                case 965: if(targs)
++                              tr_variantDictAddInt (targs, TR_KEY_cheatMode, atoi(optarg));
++                          else
++                              tr_variantDictAddInt (sargs, TR_KEY_cheatMode, atoi(optarg));
++                          break;
++                case 865: if(targs)
++                              tr_variantDictAddBool (targs, TR_KEY_cheatStopAfterDl, atoi(optarg));
++                          else
++                              tr_variantDictAddBool (sargs, TR_KEY_cheatStopAfterDl, atoi(optarg));
++                          break;
++                case 866: if(targs)
++                              tr_variantDictAddBool (targs, TR_KEY_cheatIgnorePrivate, atoi(optarg));
++                          else
++                              tr_variantDictAddBool (sargs, TR_KEY_cheatIgnorePrivate, atoi(optarg));
++                          break;
+                 default:  assert ("unhandled value" && 0);
+                           break;
+             }
+diff -uNr libtransmission/announcer.c libtransmission/announcer.c
+--- libtransmission/announcer.c	2014-07-01 19:09:00.798910723 +0200
++++ libtransmission/announcer.c	2015-12-25 17:13:48.537448000 +0100
+@@ -871,7 +871,8 @@
+ void
+ tr_announcerTorrentCompleted (tr_torrent * tor)
+ {
+-    torrentAddAnnounce (tor, TR_ANNOUNCE_EVENT_COMPLETED, tr_time ());
++    if (tor->cheatMode != TR_CHEAT_ALWSEED && tor->cheatMode != TR_CHEAT_ALWLEECH)
++        torrentAddAnnounce (tor, TR_ANNOUNCE_EVENT_COMPLETED, tr_time ());
+ }
+ void
+ tr_announcerChangeMyPort (tr_torrent * tor)
+@@ -919,6 +920,49 @@
+             ? tor->info.totalSize - tr_torrentHaveTotal (tor)
+             : ~ (uint64_t)0;
+     req->event = event;
++
++    switch( tr_torrentGetCheatMode( tier->tor ) )
++    {
++    case TR_CHEAT_ALWLEECH:
++        req->up = 0;
++        req->down = 0;
++        req->corrupt = 0;
++        req->leftUntilComplete = tor->info.totalSize;
++        if( event == TR_ANNOUNCE_EVENT_COMPLETED )
++        {
++            req->event = TR_ANNOUNCE_EVENT_NONE;
++        }
++        break;
++
++    case TR_CHEAT_ALWSEED:
++        req->down = 0;
++        req->corrupt = 0;
++        req->leftUntilComplete = 0;
++        if( event == TR_ANNOUNCE_EVENT_COMPLETED )
++        {
++            req->event = TR_ANNOUNCE_EVENT_NONE;
++        }
++        break;
++
++    case TR_CHEAT_2RATIO:
++    {
++        float rand = ( float )tr_cryptoRandInt(20)/100;
++        req->up = ( int64_t )( ( 1.95+rand ) * tier->byteCounts[TR_ANN_UP] );
++        break;
++    }
++    case TR_CHEAT_4RATIO:
++    {
++        float rand = ( float )tr_cryptoRandInt(20)/100;
++        req->up = ( int64_t )( ( 3.95+rand ) * tier->byteCounts[TR_ANN_UP] );
++        break;
++    }
++
++    case TR_CHEAT_DEACT:
++    default:
++        break;
++    }
++
++
+     req->numwant = event == TR_ANNOUNCE_EVENT_STOPPED ? 0 : NUMWANT;
+     req->key = announcer->key;
+     req->partial_seed = tr_torrentGetCompleteness (tor) == TR_PARTIAL_SEED;
+diff -uNr libtransmission/peer-msgs.c libtransmission/peer-msgs.c
+--- libtransmission/peer-msgs.c	2014-07-01 19:08:58.738910674 +0200
++++ libtransmission/peer-msgs.c	2015-12-25 02:03:54.631811000 +0100
+@@ -875,7 +875,11 @@
+ void
+ tr_peerMsgsHave (tr_peerMsgs * msgs, uint32_t index)
+ {
+-  protocolSendHave (msgs, index);
++  if (tr_torrentGetCheatMode(msgs->torrent) != TR_CHEAT_ALWLEECH)
++    {
++      dbgmsg (msgs, "cheat mode status: %d", tr_torrentGetCheatMode(msgs->torrent));
++      protocolSendHave (msgs, index);
++    }
+ 
+   /* since we have more pieces now, we might not be interested in this peer */
+   updateInterest (msgs);
+@@ -2147,18 +2151,33 @@
+ tellPeerWhatWeHave (tr_peerMsgs * msgs)
+ {
+     const bool fext = tr_peerIoSupportsFEXT (msgs->io);
++    const tr_cheatmode mode = tr_torrentGetCheatMode (msgs->torrent);
+ 
+-    if (fext && tr_torrentHasAll (msgs->torrent))
+-    {
+-        protocolSendHaveAll (msgs);
+-    }
+-    else if (fext && tr_torrentHasNone (msgs->torrent))
++    switch(mode)
+     {
+-        protocolSendHaveNone (msgs);
+-    }
+-    else if (!tr_torrentHasNone (msgs->torrent))
+-    {
+-        sendBitfield (msgs);
++    case TR_CHEAT_ALWLEECH:
++        if (fext)
++            protocolSendHaveNone (msgs);
++        break;
++
++    case TR_CHEAT_ALWSEED:
++        if (fext)
++            protocolSendHaveAll (msgs);
++        break;
++
++    default:
++        if (fext && tr_torrentHasAll (msgs->torrent))
++        {
++            protocolSendHaveAll (msgs);
++        }
++        else if (fext && tr_torrentHasNone (msgs->torrent))
++        {
++            protocolSendHaveNone (msgs);
++        }
++        else if (!tr_torrentHasNone (msgs->torrent))
++        {
++            sendBitfield (msgs);
++        }
+     }
+ }
+ 
+diff -uNr libtransmission/quark.c libtransmission/quark.c
+--- libtransmission/quark.c	2014-07-01 19:08:59.402910689 +0200
++++ libtransmission/quark.c	2015-12-30 21:00:11.010889000 +0100
+@@ -59,6 +59,9 @@
+   { "blocks", 6 },
+   { "bytesCompleted", 14 },
+   { "cache-size-mb", 13 },
++  { "cheatIgnorePrivate", 18},
++  { "cheatMode", 9 },
++  { "cheatStopAfterDl", 16 },
+   { "clientIsChoked", 14 },
+   { "clientIsInterested", 18 },
+   { "clientName", 10 },
+@@ -399,7 +402,7 @@
+   { "watch-dir", 9 },
+   { "watch-dir-enabled", 17 },
+   { "webseeds", 8 },
+-  { "webseedsSendingToUs", 19 }
++  { "webseedsSendingToUs", 19 },
+ };
+ 
+ static int
+diff -uNr libtransmission/quark.h libtransmission/quark.h
+--- libtransmission/quark.h	2014-07-01 19:08:59.402910689 +0200
++++ libtransmission/quark.h	2015-12-30 20:59:37.770888000 +0100
+@@ -57,6 +57,9 @@
+   TR_KEY_blocks,
+   TR_KEY_bytesCompleted,
+   TR_KEY_cache_size_mb,
++  TR_KEY_cheatIgnorePrivate,
++  TR_KEY_cheatMode,
++  TR_KEY_cheatStopAfterDl,
+   TR_KEY_clientIsChoked,
+   TR_KEY_clientIsInterested,
+   TR_KEY_clientName,
+@@ -401,6 +404,7 @@
+   TR_N_KEYS
+ };
+ 
++
+ /**
+  * Find the quark that matches the specified string
+  *
+diff -uNr libtransmission/resume.c libtransmission/resume.c
+--- libtransmission/resume.c	2014-07-01 19:09:01.762910745 +0200
++++ libtransmission/resume.c	2015-12-25 02:13:26.687834000 +0100
+@@ -334,6 +334,30 @@
+ ***/
+ 
+ static void
++saveCheatMode ( tr_variant * dict, const tr_torrent * tor )
++{
++      tr_variantDictAddInt ( dict, TR_KEY_cheatMode, tr_torrentGetCheatMode ( tor ) );
++}
++
++static uint64_t
++loadCheatMode ( tr_variant * dict, tr_torrent * tor )
++{
++    uint64_t ret = 0;
++    int64_t mode;
++
++    if ( tr_variantDictFindInt ( dict, TR_KEY_cheatMode, &mode ) )
++    {
++        tr_torrentSetCheatMode ( tor, (tr_cheatmode)mode);
++        ret = TR_FR_CHEATMODE;
++    }
++    return ret;
++}
++
++/***
++****
++***/
++
++static void
+ saveName (tr_variant * dict, const tr_torrent * tor)
+ {
+   tr_variantDictAddStr (dict, TR_KEY_name, tr_torrentName(tor));
+@@ -683,6 +707,7 @@
+   saveSpeedLimits (&top, tor);
+   saveRatioLimits (&top, tor);
+   saveIdleLimits (&top, tor);
++  saveCheatMode (&top, tor);
+   saveFilenames (&top, tor);
+   saveName (&top, tor);
+ 
+@@ -843,6 +868,9 @@
+   if (fieldsToLoad & TR_FR_IDLELIMIT)
+     fieldsLoaded |= loadIdleLimits (&top, tor);
+ 
++  if(fieldsToLoad & TR_FR_CHEATMODE)
++    fieldsLoaded |= loadCheatMode (&top, tor);
++
+   if (fieldsToLoad & TR_FR_FILENAMES)
+     fieldsLoaded |= loadFilenames (&top, tor);
+ 
+diff -uNr libtransmission/resume.h libtransmission/resume.h
+--- libtransmission/resume.h	2014-07-01 19:09:02.134910754 +0200
++++ libtransmission/resume.h	2015-12-24 23:39:16.215463000 +0100
+@@ -38,6 +38,7 @@
+   TR_FR_TIME_DOWNLOADING    = (1 << 19),
+   TR_FR_FILENAMES           = (1 << 20),
+   TR_FR_NAME                = (1 << 21),
++  TR_FR_CHEATMODE           = (1 << 22),
+ };
+ 
+ /**
+diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
+--- libtransmission/rpcimpl.c	2014-07-01 19:09:00.798910723 +0200
++++ libtransmission/rpcimpl.c	2015-12-30 21:48:29.531007000 +0100
+@@ -594,6 +594,18 @@
+         tr_variantDictAddInt (d, key, tr_torrentGetPriority (tor));
+         break;
+ 
++      case TR_KEY_cheatIgnorePrivate:
++        tr_variantDictAddBool (d, key, tr_torrentGetCheatIgnorePrivate(tor));
++        break;
++
++      case TR_KEY_cheatMode:
++        tr_variantDictAddInt (d, key, tr_torrentGetCheatMode(tor));
++        break;
++
++      case TR_KEY_cheatStopAfterDl:
++        tr_variantDictAddBool (d, key, tr_torrentGetCheatStopAfterDl(tor));
++        break;
++
+       case TR_KEY_comment:
+         tr_variantDictAddStr (d, key, inf->comment ? inf->comment : "");
+         break;
+@@ -1268,6 +1280,15 @@
+         if (tr_isPriority (tmp))
+           tr_torrentSetPriority (tor, tmp);
+ 
++      if (tr_variantDictFindBool (args_in, TR_KEY_cheatIgnorePrivate, &boolVal))
++        tr_torrentSetCheatIgnorePrivate (tor, boolVal);
++
++      if (tr_variantDictFindInt (args_in, TR_KEY_cheatMode, &tmp))
++        tr_torrentSetCheatMode (tor, tmp);
++
++      if (tr_variantDictFindBool (args_in, TR_KEY_cheatStopAfterDl, &boolVal))
++        tr_torrentSetCheatStopAfterDl (tor, boolVal);
++
+       if (!errmsg && tr_variantDictFindList (args_in, TR_KEY_files_unwanted, &files))
+         errmsg = setFileDLs (tor, false, files);
+ 
+@@ -1833,6 +1854,15 @@
+   if (tr_variantDictFindInt (args_in, TR_KEY_cache_size_mb, &i))
+     tr_sessionSetCacheLimit_MB (session, i);
+ 
++  if (tr_variantDictFindBool (args_in, TR_KEY_cheatIgnorePrivate, &boolVal))
++    tr_sessionSetCheatIgnorePrivate (session, boolVal);
++
++  if (tr_variantDictFindInt (args_in, TR_KEY_cheatMode, &i))
++    tr_sessionSetCheatModeDefault (session, i);
++
++  if (tr_variantDictFindBool (args_in, TR_KEY_cheatStopAfterDl, &boolVal))
++    tr_sessionSetCheatStopAfterDl (session, boolVal);
++
+   if (tr_variantDictFindInt (args_in, TR_KEY_alt_speed_up, &i))
+     tr_sessionSetAltSpeed_KBps (session, TR_UP, i);
+ 
+@@ -2037,6 +2067,9 @@
+   tr_variantDictAddBool (d, TR_KEY_blocklist_enabled, tr_blocklistIsEnabled (s));
+   tr_variantDictAddStr  (d, TR_KEY_blocklist_url, tr_blocklistGetURL (s));
+   tr_variantDictAddInt  (d, TR_KEY_cache_size_mb, tr_sessionGetCacheLimit_MB (s));
++  tr_variantDictAddBool (d, TR_KEY_cheatIgnorePrivate, tr_sessionGetCheatIgnorePrivate (s));
++  tr_variantDictAddInt  (d, TR_KEY_cheatMode, tr_sessionGetCheatModeDefault (s));
++  tr_variantDictAddBool (d, TR_KEY_cheatStopAfterDl, tr_sessionGetCheatStopAfterDl (s));
+   tr_variantDictAddInt  (d, TR_KEY_blocklist_size, tr_blocklistGetRuleCount (s));
+   tr_variantDictAddStr  (d, TR_KEY_config_dir, tr_sessionGetConfigDir (s));
+   tr_variantDictAddStr  (d, TR_KEY_download_dir, tr_sessionGetDownloadDir (s));
+diff -uNr libtransmission/session.c libtransmission/session.c
+--- libtransmission/session.c	2014-07-01 19:08:59.770910698 +0200
++++ libtransmission/session.c	2015-12-30 21:09:53.166913000 +0100
+@@ -317,6 +317,9 @@
+   tr_variantDictAddBool (d, TR_KEY_blocklist_enabled,               false);
+   tr_variantDictAddStr  (d, TR_KEY_blocklist_url,                   "http://www.example.com/blocklist");
+   tr_variantDictAddInt  (d, TR_KEY_cache_size_mb,                   DEFAULT_CACHE_SIZE_MB);
++  tr_variantDictAddBool (d, TR_KEY_cheatIgnorePrivate,              false);
++  tr_variantDictAddInt  (d, TR_KEY_cheatMode,                       TR_CHEAT_DEACT);
++  tr_variantDictAddBool (d, TR_KEY_cheatStopAfterDl,                false);
+   tr_variantDictAddBool (d, TR_KEY_dht_enabled,                     true);
+   tr_variantDictAddBool (d, TR_KEY_utp_enabled,                     true);
+   tr_variantDictAddBool (d, TR_KEY_lpd_enabled,                     false);
+@@ -388,6 +391,9 @@
+   tr_variantDictAddBool (d, TR_KEY_blocklist_enabled,            tr_blocklistIsEnabled (s));
+   tr_variantDictAddStr  (d, TR_KEY_blocklist_url,                tr_blocklistGetURL (s));
+   tr_variantDictAddInt  (d, TR_KEY_cache_size_mb,                tr_sessionGetCacheLimit_MB (s));
++  tr_variantDictAddBool (d, TR_KEY_cheatIgnorePrivate,           tr_sessionGetCheatIgnorePrivate (s));
++  tr_variantDictAddInt  (d, TR_KEY_cheatMode,                    tr_sessionGetCheatModeDefault (s));
++  tr_variantDictAddBool (d, TR_KEY_cheatStopAfterDl,             tr_sessionGetCheatStopAfterDl (s));
+   tr_variantDictAddBool (d, TR_KEY_dht_enabled,                  s->isDHTEnabled);
+   tr_variantDictAddBool (d, TR_KEY_utp_enabled,                  s->isUTPEnabled);
+   tr_variantDictAddBool (d, TR_KEY_lpd_enabled,                  s->isLPDEnabled);
+@@ -596,6 +602,9 @@
+   session->udp6_socket = -1;
+   session->lock = tr_lockNew ();
+   session->cache = tr_cacheNew (1024*1024*2);
++  session->cheatIgnorePrivate = false;
++  session->cheatModeDefault = TR_CHEAT_DEACT;
++  session->cheatStopAfterDl = false;
+   session->tag = tr_strdup (tag);
+   session->magicNumber = SESSION_MAGIC_NUMBER;
+   tr_bandwidthConstruct (&session->bandwidth, session, NULL);
+@@ -781,6 +790,12 @@
+   /* misc features */
+   if (tr_variantDictFindInt (settings, TR_KEY_cache_size_mb, &i))
+     tr_sessionSetCacheLimit_MB (session, i);
++  if (tr_variantDictFindBool (settings, TR_KEY_cheatIgnorePrivate, &boolVal))
++    tr_sessionSetCheatIgnorePrivate(session, boolVal);
++  if (tr_variantDictFindInt (settings, TR_KEY_cheatMode, &i))
++    tr_sessionSetCheatModeDefault (session, i);
++  if (tr_variantDictFindBool (settings, TR_KEY_cheatStopAfterDl, &boolVal))
++    tr_sessionSetCheatStopAfterDl (session, boolVal);
+   if (tr_variantDictFindInt (settings, TR_KEY_peer_limit_per_torrent, &i))
+     tr_sessionSetPeerLimitPerTorrent (session, i);
+   if (tr_variantDictFindBool (settings, TR_KEY_pex_enabled, &boolVal))
+@@ -1471,6 +1486,62 @@
+ }
+ 
+ /***
++****  Session cheat mode
++***/
++
++void
++tr_sessionSetCheatIgnorePrivate( tr_session *s, bool ignorePrivate)
++{
++    assert (tr_isSession (s));
++
++    s->cheatIgnorePrivate = ignorePrivate;
++}
++
++bool
++tr_sessionGetCheatIgnorePrivate( const tr_session *s )
++{
++    assert (tr_isSession (s));
++
++    return s->cheatIgnorePrivate;
++}
++
++void
++tr_sessionSetCheatModeDefault( tr_session *s, tr_cheatmode cheatMode )
++{
++    assert (tr_isSession (s));
++
++    s->cheatModeDefault = TR_CHEAT_DEACT;
++    if( cheatMode >= TR_CHEAT_DEACT && cheatMode < TR_CHEAT_COUNT )
++    {
++        s->cheatModeDefault = cheatMode;
++    }
++}
++
++tr_cheatmode
++tr_sessionGetCheatModeDefault( const tr_session *s )
++{
++    assert (tr_isSession (s));
++
++    return s->cheatModeDefault;
++}
++
++void
++tr_sessionSetCheatStopAfterDl( tr_session *s, bool stopAfter )
++{
++    assert (tr_isSession (s));
++
++    s->cheatStopAfterDl = stopAfter;
++}
++
++bool
++tr_sessionGetCheatStopAfterDl( const tr_session *s )
++{
++    assert (tr_isSession (s));
++
++    return s->cheatStopAfterDl;
++}
++
++/***
+ ****  Alternative speed limits that are used during scheduled times
+ ***/
+ 
+diff -uNr libtransmission/session.h libtransmission/session.h
+--- libtransmission/session.h	2014-07-01 19:09:00.494910715 +0200
++++ libtransmission/session.h	2015-12-30 21:04:04.394899000 +0100
+@@ -221,6 +221,11 @@
+ 
+     struct tr_bindinfo         * public_ipv4;
+     struct tr_bindinfo         * public_ipv6;
++
++    /* default cheating system */
++    bool                        cheatIgnorePrivate;
++    tr_cheatmode                cheatModeDefault;
++    bool                        cheatStopAfterDl;
+ };
+ 
+ static inline tr_port
+diff -uNr libtransmission/torrent.c libtransmission/torrent.c
+--- libtransmission/torrent.c	2014-07-01 19:09:02.594910765 +0200
++++ libtransmission/torrent.c	2015-12-30 21:43:33.834995000 +0100
+@@ -866,6 +866,9 @@
+   tor->uniqueId = nextUniqueId++;
+   tor->magicNumber = TORRENT_MAGIC_NUMBER;
+   tor->queuePosition = session->torrentCount;
++  tor->cheatIgnorePrivate = session->cheatIgnorePrivate;
++  tor->cheatMode = session->cheatModeDefault;
++  tor->cheatStopAfterDl = session->cheatStopAfterDl;
+ 
+   tr_sha1 (tor->obfuscatedHash, "req2", 4,
+            tor->info.hash, SHA_DIGEST_LENGTH,
+@@ -2179,6 +2182,9 @@
+ 
+           if (tor->currentDir == tor->incompleteDir)
+             tr_torrentSetLocation (tor, tor->downloadDir, true, NULL, NULL);
++
++          if (tor->cheatStopAfterDl)
++            tr_torrentStop (tor);
+         }
+ 
+       fireCompletenessChange (tor, completeness, wasRunning);
+@@ -2434,6 +2440,64 @@
+ 
+ /***
+ ****
++***/
++
++void
++tr_torrentSetCheatIgnorePrivate( tr_torrent * tor, bool ignorePrivate)
++{
++    assert( tr_isTorrent( tor ) );
++
++    tor->cheatIgnorePrivate = ignorePrivate;
++}
++
++bool
++tr_torrentGetCheatIgnorePrivate( const tr_torrent * tor )
++{
++    assert( tr_isTorrent( tor ) );
++
++    return tor->cheatIgnorePrivate;
++}
++
++void
++tr_torrentSetCheatMode(tr_torrent * tor, tr_cheatmode mode )
++{
++    assert( tr_isTorrent( tor ) );
++
++    if( (mode >= TR_CHEAT_DEACT && mode < TR_CHEAT_COUNT) && mode != tor->cheatMode )
++    {
++        tor->cheatMode = mode;
++
++        tr_torrentSetDirty (tor);
++    }
++}
++
++tr_cheatmode
++tr_torrentGetCheatMode( const tr_torrent * tor )
++{
++    assert( tr_isTorrent( tor ) );
++
++    return tor->cheatMode;
++}
++
++void
++tr_torrentSetCheatStopAfterDl(tr_torrent * tor, bool stopAfter )
++{
++    assert( tr_isTorrent( tor ) );
++
++    tor->cheatStopAfterDl = stopAfter;
++}
++
++tr_cheatmode
++tr_torrentGetCheatStopAfterDl( const tr_torrent * tor )
++{
++    assert( tr_isTorrent( tor ) );
++
++    return tor->cheatStopAfterDl;
++}
++
++
++/***
++****
+ ***/
+ 
+ void
+diff -uNr libtransmission/torrent.h libtransmission/torrent.h
+--- libtransmission/torrent.h	2014-07-01 19:08:58.738910674 +0200
++++ libtransmission/torrent.h	2015-12-30 21:13:18.906921000 +0100
+@@ -272,6 +272,10 @@
+     uint16_t                   idleLimitMinutes;
+     tr_idlelimit               idleLimitMode;
+     bool                       finishedSeedingByIdle;
++
++    bool                       cheatIgnorePrivate;
++    tr_cheatmode               cheatMode;
++    bool                       cheatStopAfterDl;
+ };
+ 
+ static inline tr_torrent*
+diff -uNr libtransmission/transmission.h libtransmission/transmission.h
+--- libtransmission/transmission.h	2014-07-01 19:09:01.682910744 +0200
++++ libtransmission/transmission.h	2015-12-30 21:12:46.038920000 +0100
+@@ -605,7 +605,6 @@
+ void  tr_sessionLimitSpeed       (tr_session *, tr_direction, bool);
+ bool  tr_sessionIsSpeedLimited   (const tr_session *, tr_direction);
+ 
+-
+ /***
+ ****  Alternative speed limits that are used during scheduled times
+ ***/
+@@ -1308,6 +1307,39 @@
+ uint16_t      tr_torrentGetPeerLimit (const tr_torrent * tor);
+ 
+ /****
++*****  cheat mode
++****/
++
++typedef enum
++{
++    TR_CHEAT_DEACT     =  0,
++    TR_CHEAT_ALWLEECH  =  1, /* always seeder */
++    TR_CHEAT_ALWSEED   =  2, /* always leecher */
++    TR_CHEAT_2RATIO    =  3, /* report a ratio of ~2 */
++    TR_CHEAT_4RATIO    =  4, /* report a ratio of ~4 */
++    TR_CHEAT_COUNT
++}
++tr_cheatmode;
++
++void         tr_torrentSetCheatIgnorePrivate( tr_torrent *, bool ignorePrivate);
++bool         tr_torrentGetCheatIgnorePrivate( const tr_torrent * );
++
++void         tr_torrentSetCheatMode( tr_torrent * tor, tr_cheatmode mode );
++tr_cheatmode tr_torrentGetCheatMode( const tr_torrent * tor );
++
++void         tr_torrentSetCheatStopAfterDl( tr_torrent * tor, bool stopAfter );
++tr_cheatmode tr_torrentGetCheatStopAfterDl( const tr_torrent * tor );
++
++void         tr_sessionSetCheatIgnorePrivate( tr_session *, bool ignorePrivate);
++bool         tr_sessionGetCheatIgnorePrivate( const tr_session * );
++
++void         tr_sessionSetCheatModeDefault( tr_session *, tr_cheatmode cheatModeDefault );
++tr_cheatmode tr_sessionGetCheatModeDefault( const tr_session * );
++
++void         tr_sessionSetCheatStopAfterDl( tr_session *s, bool stopAfter );
++bool         tr_sessionGetCheatStopAfterDl( const tr_session * );
++
++/****
+ *****  File Priorities
+ ****/
+ 
