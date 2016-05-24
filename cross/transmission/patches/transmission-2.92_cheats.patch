@@ -1,7 +1,7 @@
 diff -uNr cli/cli.c cli/cli.c
---- cli/cli.c	2014-07-01 19:10:43.482913163 +0200
-+++ cli/cli.c	2015-12-25 17:39:22.705509874 +0100
-@@ -93,6 +93,8 @@
+--- cli/cli.c	2015-10-20 08:41:05.117746908 +0200
++++ cli/cli.c	2016-05-24 19:36:25.190219326 +0200
+@@ -95,6 +95,8 @@
    { 'v', "verify",               "Verify the specified torrent", "v",  0, NULL        },
    { 'V', "version",              "Show version number and exit", "V", 0, NULL },
    { 'w', "download-dir",         "Where to save downloaded data", "w",  1, "<path>"    },
@@ -10,7 +10,7 @@ diff -uNr cli/cli.c cli/cli.c
    { 0, NULL, NULL, NULL, 0, NULL }
  };
  
-@@ -472,6 +474,14 @@
+@@ -475,6 +477,14 @@
                torrentPath = optarg;
              break;
  
@@ -26,9 +26,9 @@ diff -uNr cli/cli.c cli/cli.c
              return 1;
          }
 diff -uNr daemon/remote.c daemon/remote.c
---- daemon/remote.c	2014-07-01 19:10:39.462913067 +0200
-+++ daemon/remote.c	2015-12-30 21:54:06.899021664 +0100
-@@ -309,6 +309,9 @@
+--- daemon/remote.c	2016-03-06 07:30:35.407000212 +0100
++++ daemon/remote.c	2016-05-24 19:36:25.190219326 +0200
+@@ -305,6 +305,9 @@
      { 'y', "lpd",                    "Enable local peer discovery (LPD)", "y",  0, NULL },
      { 'Y', "no-lpd",                 "Disable local peer discovery (LPD)", "Y",  0, NULL },
      { 941, "peer-info",              "List the current torrent(s)' peers", "pi",  0, NULL },
@@ -38,7 +38,7 @@ diff -uNr daemon/remote.c daemon/remote.c
      {   0, NULL,                     NULL, NULL, 0, NULL }
  };
  
-@@ -445,6 +448,9 @@
+@@ -441,6 +444,9 @@
        case 'u': /* upload speed limit */
        case 'U': /* no upload speed limit */
        case 930: /* peers */
@@ -48,7 +48,7 @@ diff -uNr daemon/remote.c daemon/remote.c
          return MODE_SESSION_SET | MODE_TORRENT_SET;
  
        case 's': /* start */
-@@ -681,6 +687,9 @@
+@@ -637,6 +643,9 @@
      TR_KEY_activityDate,
      TR_KEY_addedDate,
      TR_KEY_bandwidthPriority,
@@ -58,7 +58,7 @@ diff -uNr daemon/remote.c daemon/remote.c
      TR_KEY_comment,
      TR_KEY_corruptEver,
      TR_KEY_creator,
-@@ -1074,6 +1083,36 @@
+@@ -1030,6 +1039,36 @@
                          bandwidthPriorityNames[ (i + 1) & 3]);
  
              printf ("\n");
@@ -95,7 +95,7 @@ diff -uNr daemon/remote.c daemon/remote.c
          }
      }
  }
-@@ -1619,6 +1658,38 @@
+@@ -1576,6 +1615,38 @@
              printf ("  Autostart added torrents: %s\n", (boolVal ? "Yes" : "No"));
          if (tr_variantDictFindBool (args, TR_KEY_trash_original_torrent_files, &boolVal))
              printf ("  Delete automatically added torrents: %s\n", (boolVal ? "Yes" : "No"));
@@ -134,7 +134,7 @@ diff -uNr daemon/remote.c daemon/remote.c
      }
  }
  
-@@ -2141,6 +2212,21 @@
+@@ -2096,6 +2167,21 @@
                            else
                                tr_variantDictAddInt (sargs, TR_KEY_peer_limit_global, atoi (optarg));
                            break;
@@ -157,8 +157,8 @@ diff -uNr daemon/remote.c daemon/remote.c
                            break;
              }
 diff -uNr libtransmission/announcer.c libtransmission/announcer.c
---- libtransmission/announcer.c	2014-07-01 19:09:00.798910723 +0200
-+++ libtransmission/announcer.c	2015-12-25 17:13:48.537448000 +0100
+--- libtransmission/announcer.c	2015-12-31 19:33:37.580878587 +0100
++++ libtransmission/announcer.c	2016-05-24 19:47:18.196113079 +0200
 @@ -871,7 +871,8 @@
  void
  tr_announcerTorrentCompleted (tr_torrent * tor)
@@ -199,13 +199,13 @@ diff -uNr libtransmission/announcer.c libtransmission/announcer.c
 +
 +    case TR_CHEAT_2RATIO:
 +    {
-+        float rand = ( float )tr_cryptoRandInt(20)/100;
++        float rand = ( float )tr_rand_int_weak(20)/100;
 +        req->up = ( int64_t )( ( 1.95+rand ) * tier->byteCounts[TR_ANN_UP] );
 +        break;
 +    }
 +    case TR_CHEAT_4RATIO:
 +    {
-+        float rand = ( float )tr_cryptoRandInt(20)/100;
++        float rand = ( float )tr_rand_int_weak(20)/100;
 +        req->up = ( int64_t )( ( 3.95+rand ) * tier->byteCounts[TR_ANN_UP] );
 +        break;
 +    }
@@ -220,9 +220,9 @@ diff -uNr libtransmission/announcer.c libtransmission/announcer.c
      req->key = announcer->key;
      req->partial_seed = tr_torrentGetCompleteness (tor) == TR_PARTIAL_SEED;
 diff -uNr libtransmission/peer-msgs.c libtransmission/peer-msgs.c
---- libtransmission/peer-msgs.c	2014-07-01 19:08:58.738910674 +0200
-+++ libtransmission/peer-msgs.c	2015-12-25 02:03:54.631811000 +0100
-@@ -875,7 +875,11 @@
+--- libtransmission/peer-msgs.c	2016-01-09 19:02:58.738698801 +0100
++++ libtransmission/peer-msgs.c	2016-05-24 19:36:25.190219326 +0200
+@@ -877,7 +877,11 @@
  void
  tr_peerMsgsHave (tr_peerMsgs * msgs, uint32_t index)
  {
@@ -235,7 +235,7 @@ diff -uNr libtransmission/peer-msgs.c libtransmission/peer-msgs.c
  
    /* since we have more pieces now, we might not be interested in this peer */
    updateInterest (msgs);
-@@ -2147,18 +2151,33 @@
+@@ -2157,18 +2161,33 @@
  tellPeerWhatWeHave (tr_peerMsgs * msgs)
  {
      const bool fext = tr_peerIoSupportsFEXT (msgs->io);
@@ -280,8 +280,8 @@ diff -uNr libtransmission/peer-msgs.c libtransmission/peer-msgs.c
  }
  
 diff -uNr libtransmission/quark.c libtransmission/quark.c
---- libtransmission/quark.c	2014-07-01 19:08:59.402910689 +0200
-+++ libtransmission/quark.c	2015-12-30 21:00:11.010889000 +0100
+--- libtransmission/quark.c	2016-01-09 19:02:58.738698801 +0100
++++ libtransmission/quark.c	2016-05-24 19:36:25.190219326 +0200
 @@ -59,6 +59,9 @@
    { "blocks", 6 },
    { "bytesCompleted", 14 },
@@ -302,9 +302,9 @@ diff -uNr libtransmission/quark.c libtransmission/quark.c
  
  static int
 diff -uNr libtransmission/quark.h libtransmission/quark.h
---- libtransmission/quark.h	2014-07-01 19:08:59.402910689 +0200
-+++ libtransmission/quark.h	2015-12-30 20:59:37.770888000 +0100
-@@ -57,6 +57,9 @@
+--- libtransmission/quark.h	2015-06-28 21:23:49.613528096 +0200
++++ libtransmission/quark.h	2016-05-24 19:36:25.190219326 +0200
+@@ -61,6 +61,9 @@
    TR_KEY_blocks,
    TR_KEY_bytesCompleted,
    TR_KEY_cache_size_mb,
@@ -314,7 +314,7 @@ diff -uNr libtransmission/quark.h libtransmission/quark.h
    TR_KEY_clientIsChoked,
    TR_KEY_clientIsInterested,
    TR_KEY_clientName,
-@@ -401,6 +404,7 @@
+@@ -405,6 +408,7 @@
    TR_N_KEYS
  };
  
@@ -323,9 +323,9 @@ diff -uNr libtransmission/quark.h libtransmission/quark.h
   * Find the quark that matches the specified string
   *
 diff -uNr libtransmission/resume.c libtransmission/resume.c
---- libtransmission/resume.c	2014-07-01 19:09:01.762910745 +0200
-+++ libtransmission/resume.c	2015-12-25 02:13:26.687834000 +0100
-@@ -334,6 +334,30 @@
+--- libtransmission/resume.c	2015-12-31 19:33:37.573878462 +0100
++++ libtransmission/resume.c	2016-05-24 19:36:25.190219326 +0200
+@@ -336,6 +336,30 @@
  ***/
  
  static void
@@ -356,7 +356,7 @@ diff -uNr libtransmission/resume.c libtransmission/resume.c
  saveName (tr_variant * dict, const tr_torrent * tor)
  {
    tr_variantDictAddStr (dict, TR_KEY_name, tr_torrentName(tor));
-@@ -683,6 +707,7 @@
+@@ -685,6 +709,7 @@
    saveSpeedLimits (&top, tor);
    saveRatioLimits (&top, tor);
    saveIdleLimits (&top, tor);
@@ -364,7 +364,7 @@ diff -uNr libtransmission/resume.c libtransmission/resume.c
    saveFilenames (&top, tor);
    saveName (&top, tor);
  
-@@ -843,6 +868,9 @@
+@@ -847,6 +872,9 @@
    if (fieldsToLoad & TR_FR_IDLELIMIT)
      fieldsLoaded |= loadIdleLimits (&top, tor);
  
@@ -375,8 +375,8 @@ diff -uNr libtransmission/resume.c libtransmission/resume.c
      fieldsLoaded |= loadFilenames (&top, tor);
  
 diff -uNr libtransmission/resume.h libtransmission/resume.h
---- libtransmission/resume.h	2014-07-01 19:09:02.134910754 +0200
-+++ libtransmission/resume.h	2015-12-24 23:39:16.215463000 +0100
+--- libtransmission/resume.h	2014-12-10 20:22:42.955222992 +0100
++++ libtransmission/resume.h	2016-05-24 19:36:25.190219326 +0200
 @@ -38,6 +38,7 @@
    TR_FR_TIME_DOWNLOADING    = (1 << 19),
    TR_FR_FILENAMES           = (1 << 20),
@@ -386,9 +386,9 @@ diff -uNr libtransmission/resume.h libtransmission/resume.h
  
  /**
 diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
---- libtransmission/rpcimpl.c	2014-07-01 19:09:00.798910723 +0200
-+++ libtransmission/rpcimpl.c	2015-12-30 21:48:29.531007000 +0100
-@@ -594,6 +594,18 @@
+--- libtransmission/rpcimpl.c	2015-12-31 19:33:37.584878658 +0100
++++ libtransmission/rpcimpl.c	2016-05-24 19:36:25.190219326 +0200
+@@ -592,6 +592,18 @@
          tr_variantDictAddInt (d, key, tr_torrentGetPriority (tor));
          break;
  
@@ -407,7 +407,7 @@ diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
        case TR_KEY_comment:
          tr_variantDictAddStr (d, key, inf->comment ? inf->comment : "");
          break;
-@@ -1268,6 +1280,15 @@
+@@ -1266,6 +1278,15 @@
          if (tr_isPriority (tmp))
            tr_torrentSetPriority (tor, tmp);
  
@@ -423,7 +423,7 @@ diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
        if (!errmsg && tr_variantDictFindList (args_in, TR_KEY_files_unwanted, &files))
          errmsg = setFileDLs (tor, false, files);
  
-@@ -1833,6 +1854,15 @@
+@@ -1856,6 +1877,15 @@
    if (tr_variantDictFindInt (args_in, TR_KEY_cache_size_mb, &i))
      tr_sessionSetCacheLimit_MB (session, i);
  
@@ -439,7 +439,7 @@ diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
    if (tr_variantDictFindInt (args_in, TR_KEY_alt_speed_up, &i))
      tr_sessionSetAltSpeed_KBps (session, TR_UP, i);
  
-@@ -2037,6 +2067,9 @@
+@@ -2060,6 +2090,9 @@
    tr_variantDictAddBool (d, TR_KEY_blocklist_enabled, tr_blocklistIsEnabled (s));
    tr_variantDictAddStr  (d, TR_KEY_blocklist_url, tr_blocklistGetURL (s));
    tr_variantDictAddInt  (d, TR_KEY_cache_size_mb, tr_sessionGetCacheLimit_MB (s));
@@ -450,9 +450,9 @@ diff -uNr libtransmission/rpcimpl.c libtransmission/rpcimpl.c
    tr_variantDictAddStr  (d, TR_KEY_config_dir, tr_sessionGetConfigDir (s));
    tr_variantDictAddStr  (d, TR_KEY_download_dir, tr_sessionGetDownloadDir (s));
 diff -uNr libtransmission/session.c libtransmission/session.c
---- libtransmission/session.c	2014-07-01 19:08:59.770910698 +0200
-+++ libtransmission/session.c	2015-12-30 21:09:53.166913000 +0100
-@@ -317,6 +317,9 @@
+--- libtransmission/session.c	2016-01-09 19:02:58.743698889 +0100
++++ libtransmission/session.c	2016-05-24 19:37:24.527395465 +0200
+@@ -321,6 +321,9 @@
    tr_variantDictAddBool (d, TR_KEY_blocklist_enabled,               false);
    tr_variantDictAddStr  (d, TR_KEY_blocklist_url,                   "http://www.example.com/blocklist");
    tr_variantDictAddInt  (d, TR_KEY_cache_size_mb,                   DEFAULT_CACHE_SIZE_MB);
@@ -462,7 +462,7 @@ diff -uNr libtransmission/session.c libtransmission/session.c
    tr_variantDictAddBool (d, TR_KEY_dht_enabled,                     true);
    tr_variantDictAddBool (d, TR_KEY_utp_enabled,                     true);
    tr_variantDictAddBool (d, TR_KEY_lpd_enabled,                     false);
-@@ -388,6 +391,9 @@
+@@ -392,6 +395,9 @@
    tr_variantDictAddBool (d, TR_KEY_blocklist_enabled,            tr_blocklistIsEnabled (s));
    tr_variantDictAddStr  (d, TR_KEY_blocklist_url,                tr_blocklistGetURL (s));
    tr_variantDictAddInt  (d, TR_KEY_cache_size_mb,                tr_sessionGetCacheLimit_MB (s));
@@ -472,17 +472,17 @@ diff -uNr libtransmission/session.c libtransmission/session.c
    tr_variantDictAddBool (d, TR_KEY_dht_enabled,                  s->isDHTEnabled);
    tr_variantDictAddBool (d, TR_KEY_utp_enabled,                  s->isUTPEnabled);
    tr_variantDictAddBool (d, TR_KEY_lpd_enabled,                  s->isLPDEnabled);
-@@ -596,6 +602,9 @@
-   session->udp6_socket = -1;
+@@ -599,6 +605,9 @@
+   session->udp6_socket = TR_BAD_SOCKET;
    session->lock = tr_lockNew ();
    session->cache = tr_cacheNew (1024*1024*2);
 +  session->cheatIgnorePrivate = false;
 +  session->cheatModeDefault = TR_CHEAT_DEACT;
 +  session->cheatStopAfterDl = false;
-   session->tag = tr_strdup (tag);
    session->magicNumber = SESSION_MAGIC_NUMBER;
    tr_bandwidthConstruct (&session->bandwidth, session, NULL);
-@@ -781,6 +790,12 @@
+   tr_variantInitList (&session->removedTorrents, 0);
+@@ -785,6 +794,12 @@
    /* misc features */
    if (tr_variantDictFindInt (settings, TR_KEY_cache_size_mb, &i))
      tr_sessionSetCacheLimit_MB (session, i);
@@ -495,7 +495,7 @@ diff -uNr libtransmission/session.c libtransmission/session.c
    if (tr_variantDictFindInt (settings, TR_KEY_peer_limit_per_torrent, &i))
      tr_sessionSetPeerLimitPerTorrent (session, i);
    if (tr_variantDictFindBool (settings, TR_KEY_pex_enabled, &boolVal))
-@@ -1471,6 +1486,62 @@
+@@ -1475,6 +1490,62 @@
  }
  
  /***
@@ -559,8 +559,8 @@ diff -uNr libtransmission/session.c libtransmission/session.c
  ***/
  
 diff -uNr libtransmission/session.h libtransmission/session.h
---- libtransmission/session.h	2014-07-01 19:09:00.494910715 +0200
-+++ libtransmission/session.h	2015-12-30 21:04:04.394899000 +0100
+--- libtransmission/session.h	2015-10-20 08:41:05.053745757 +0200
++++ libtransmission/session.h	2016-05-24 19:36:25.198218163 +0200
 @@ -221,6 +221,11 @@
  
      struct tr_bindinfo         * public_ipv4;
@@ -574,8 +574,8 @@ diff -uNr libtransmission/session.h libtransmission/session.h
  
  static inline tr_port
 diff -uNr libtransmission/torrent.c libtransmission/torrent.c
---- libtransmission/torrent.c	2014-07-01 19:09:02.594910765 +0200
-+++ libtransmission/torrent.c	2015-12-30 21:43:33.834995000 +0100
+--- libtransmission/torrent.c	2015-12-31 19:33:37.571878427 +0100
++++ libtransmission/torrent.c	2016-05-24 19:36:25.198218163 +0200
 @@ -866,6 +866,9 @@
    tor->uniqueId = nextUniqueId++;
    tor->magicNumber = TORRENT_MAGIC_NUMBER;
@@ -586,7 +586,7 @@ diff -uNr libtransmission/torrent.c libtransmission/torrent.c
  
    tr_sha1 (tor->obfuscatedHash, "req2", 4,
             tor->info.hash, SHA_DIGEST_LENGTH,
-@@ -2179,6 +2182,9 @@
+@@ -2236,6 +2239,9 @@
  
            if (tor->currentDir == tor->incompleteDir)
              tr_torrentSetLocation (tor, tor->downloadDir, true, NULL, NULL);
@@ -596,7 +596,7 @@ diff -uNr libtransmission/torrent.c libtransmission/torrent.c
          }
  
        fireCompletenessChange (tor, completeness, wasRunning);
-@@ -2434,6 +2440,64 @@
+@@ -2491,6 +2497,64 @@
  
  /***
  ****
@@ -662,8 +662,8 @@ diff -uNr libtransmission/torrent.c libtransmission/torrent.c
  
  void
 diff -uNr libtransmission/torrent.h libtransmission/torrent.h
---- libtransmission/torrent.h	2014-07-01 19:08:58.738910674 +0200
-+++ libtransmission/torrent.h	2015-12-30 21:13:18.906921000 +0100
+--- libtransmission/torrent.h	2015-12-29 01:47:32.453150440 +0100
++++ libtransmission/torrent.h	2016-05-24 19:36:25.198218163 +0200
 @@ -272,6 +272,10 @@
      uint16_t                   idleLimitMinutes;
      tr_idlelimit               idleLimitMode;
@@ -676,9 +676,9 @@ diff -uNr libtransmission/torrent.h libtransmission/torrent.h
  
  static inline tr_torrent*
 diff -uNr libtransmission/transmission.h libtransmission/transmission.h
---- libtransmission/transmission.h	2014-07-01 19:09:01.682910744 +0200
-+++ libtransmission/transmission.h	2015-12-30 21:12:46.038920000 +0100
-@@ -605,7 +605,6 @@
+--- libtransmission/transmission.h	2015-12-31 19:33:37.576878516 +0100
++++ libtransmission/transmission.h	2016-05-24 19:36:25.198218163 +0200
+@@ -565,7 +565,6 @@
  void  tr_sessionLimitSpeed       (tr_session *, tr_direction, bool);
  bool  tr_sessionIsSpeedLimited   (const tr_session *, tr_direction);
  
@@ -686,7 +686,7 @@ diff -uNr libtransmission/transmission.h libtransmission/transmission.h
  /***
  ****  Alternative speed limits that are used during scheduled times
  ***/
-@@ -1308,6 +1307,39 @@
+@@ -1268,6 +1267,39 @@
  uint16_t      tr_torrentGetPeerLimit (const tr_torrent * tor);
  
  /****
